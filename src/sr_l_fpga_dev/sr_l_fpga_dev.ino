@@ -102,10 +102,10 @@ void CPU_CORE_0_MAIN()
 void CPU_CORE_1_INIT()
 {
     // SPI初期化
-    pinMode(SPI_MISO_PIN, OUTPUT);
-    pinMode(SPI_CS_PIN, INPUT);
-    pinMode(SPI_SCK_PIN, INPUT);
-    pinMode(SPI_MOSI_PIN, INPUT);
+    SPI.setMISO(SPI_MISO_PIN);
+    SPI.setSCK(SPI_SCK_PIN);
+    SPI.setMOSI(SPI_MOSI_PIN);
+    digitalWrite(SPI_CS_PIN, HIGH);
     SPI.begin();
 }
 
