@@ -21,12 +21,15 @@
     assign o_led_en = 1'b1; // LEDを有効化
     assign o_clk_en = 1'b1; // クロックを有効化
 
+    // SPIの受信したデータ解析
     always @(posedge i_clk or negedge i_rst_n) begin
         if(!i_rst_n) begin
             o_led <= 1'b0;
         end else if(w_spi_s_rx_done) begin
+            // 受信データ = 0xAAならLEDをON
             if(w_spi_s_rx_data == 8'hAA) begin
                 o_led <= 1'b1;
+            // 受信データ = 0x55ならLEDをOFF
             end else if(w_spi_s_rx_data == 8'h55) begin
                 o_led <= 1'b0;
             end
