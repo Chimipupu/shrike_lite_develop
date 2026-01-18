@@ -23,7 +23,7 @@
 #ifdef SR_L_FPGA_BITSTREAM_WRITE
 #include "Shrike.h"
 ShrikeFlash shrike;
-#define FPGA_BITSTREAM_PATH    "/led_blink.bin"
+#define FPGA_BITSTREAM_PATH    "/FPGA_bitstream_MCU.bin"
 static void fpga_init(const char* bitstream_path);
 #endif // SR_L_FPGA_BITSTREAM_WRITE
 
@@ -58,6 +58,9 @@ void CPU_CORE_0_INIT()
     fpga_init(FPGA_BITSTREAM_PATH);
 #endif // SR_L_FPGA_BITSTREAM_WRITE
 
+    // GPIO初期化
+    pinMode(LED_BUILTIN, OUTPUT);
+
     // シリアル初期化
     Serial.begin(115200);
     while (!Serial && millis() < 3000);
@@ -65,7 +68,16 @@ void CPU_CORE_0_INIT()
 
 void CPU_CORE_0_MAIN()
 {
-  // TODO: メインループ処理
+    // LED点滅
+    static bool led_state = false;
+    led_state = !led_state;
+    digitalWrite(LED_BUILTIN, led_state ? HIGH : LOW);
+    if(led_state) {
+        Serial.println("[RP2040] LED: ON");
+    } else {
+        Serial.println("[RP2040] LED: OFF");
+    }
+    delay(1000);
 }
 
 // *************************************************************
