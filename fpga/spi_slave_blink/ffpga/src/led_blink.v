@@ -28,9 +28,6 @@ module led_blink(
                 cnt_reg <= 32'b0; // カウンタリセット
                 pin_state_bit <= ~pin_state_bit; // ピン状態反転
             end
-        end else if(cnt_reg == 50_000_000) begin
-            cnt_reg <= 32'b0; // カウンタリセット
-            pin_state_bit <= ~pin_state_bit; // ピン状態反転
         end
     end
 

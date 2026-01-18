@@ -8,30 +8,39 @@
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  * 
  */
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
 
 #define CPU_CORE_0_INIT    setup
 #define CPU_CORE_0_MAIN    loop
 #define CPU_CORE_1_INIT    setup1
 #define CPU_CORE_1_MAIN    loop1
 
+#include <SPI.h>
+#define SPI_MISO_PIN       0
+#define SPI_CS_PIN         1
+#define SPI_SCK_PIN        2
+#define SPI_MOSI_PIN       3
+
+#define FPGA_RSTn_PIN      14 // FPGAリセットピン(Lowアクティブ)
 // *************************************************************
 // [FPGA関連設定]
-
-// コンパイルスイッチ[FPGAへのビットストリーム書き込み有無]
-#define SR_L_FPGA_BITSTREAM_WRITE
-
-#ifdef SR_L_FPGA_BITSTREAM_WRITE
 #include "Shrike.h"
 ShrikeFlash shrike;
 #define FPGA_BITSTREAM_PATH    "/FPGA_bitstream_MCU.bin"
 static void fpga_init(const char* bitstream_path);
-#endif // SR_L_FPGA_BITSTREAM_WRITE
+static void fpga_reset(void);
+static void fpga_reg_write(uint8_t reg_addr, uint8_t data);
 
 // *************************************************************
 // [Static関数]
 // *************************************************************
+static void fpga_reset(void)
+{
+    digitalWrite(FPGA_RSTn_PIN, LOW);
+}
 
-#ifdef SR_L_FPGA_BITSTREAM_WRITE
 /**
  * @brief FPGA初期化(ビットストリーム書き込み)
  * 
@@ -39,24 +48,30 @@ static void fpga_init(const char* bitstream_path);
  */
 static void fpga_init(const char* bitstream_path)
 {
+    pinMode(FPGA_RSTn_PIN, OUTPUT);
+
     // ビットストリームをSPIで書き込み
     shrike.begin();
     shrike.flash(bitstream_path);
 
     // TODO: FPGAの初期化完了確認
 }
-#endif // SR_L_FPGA_USE_BITSTREAM_WRITE
 
+static void fpga_reg_write(uint8_t reg_addr, uint8_t data)
+{
+    digitalWrite(SPI_CS_PIN, LOW);  // CSアサート
+    // SPI.transfer(reg_addr);          // レジスタアドレス送信
+    SPI.transfer(data);              // データ送信
+    digitalWrite(SPI_CS_PIN, HIGH); // CSデアサート
+}
 // *************************************************************
 // [CPU Core 0]
 // *************************************************************
 
 void CPU_CORE_0_INIT()
 {
-#ifdef SR_L_FPGA_BITSTREAM_WRITE
     // FPGA初期化
     fpga_init(FPGA_BITSTREAM_PATH);
-#endif // SR_L_FPGA_BITSTREAM_WRITE
 
     // GPIO初期化
     pinMode(LED_BUILTIN, OUTPUT);
@@ -86,10 +101,18 @@ void CPU_CORE_0_MAIN()
 
 void CPU_CORE_1_INIT()
 {
-    // TODO: CPU コア1の初期化処理
+    // SPI初期化
+    pinMode(SPI_MISO_PIN, OUTPUT);
+    pinMode(SPI_CS_PIN, INPUT);
+    pinMode(SPI_SCK_PIN, INPUT);
+    pinMode(SPI_MOSI_PIN, INPUT);
+    SPI.begin();
 }
 
 void CPU_CORE_1_MAIN()
 {
-    // TODO: CPU コア1のメインループ処理
+    static uint8_t s_cnt = 0;
+    fpga_reg_write(0x00, s_cnt);
+    s_cnt = (s_cnt + 1) % 0xFF;
+    delay(100);
 }
