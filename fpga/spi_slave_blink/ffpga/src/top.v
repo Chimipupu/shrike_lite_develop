@@ -18,6 +18,9 @@
     wire w_spi_s_rx_done;
     wire [7:0] w_spi_s_rx_data;
 
+    wire w_spi_s_tx_done;
+    wire [7:0] w_spi_s_tx_data;
+
     assign o_led_en = 1'b1; // LEDを有効化
     assign o_clk_en = 1'b1; // クロックを有効化
 
@@ -41,12 +44,14 @@
         .i_clk(i_clk),
         .i_rst_n(i_rst_n),
         .i_spi_s_sck(i_spi_s_sck),
-        .i_spi_s_mosi(i_spi_s_mosi),
         .i_spi_s_cs_n(i_spi_s_cs_n),
+        .i_spi_s_mosi(i_spi_s_mosi),
         .o_spi_s_miso(o_spi_s_miso),
         .o_spi_s_miso_oe(o_spi_s_miso_oe),
         .o_spi_s_rx_done(w_spi_s_rx_done),
-        .o_spi_s_rx_data(w_spi_s_rx_data)
+        .o_spi_s_rx_data(w_spi_s_rx_data),
+        .o_spi_s_tx_done(w_spi_s_tx_done),
+        .o_spi_s_tx_data(w_spi_s_tx_data)
     );
 
 endmodule
