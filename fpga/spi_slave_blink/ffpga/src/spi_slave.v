@@ -13,13 +13,13 @@ module spi_slave(
 
     assign o_spi_s_miso_oe = ~i_spi_s_cs_n;
 
-    always @(posedge i_spi_s_sck or posedge i_spi_s_cs_n) begin
+    always @(posedge i_spi_s_sck) begin
         // CS_n = High ならリセット
         if (i_spi_s_cs_n) begin
-            r_bit_cnt       <= 3'd0;    // 8'd0 -> 3'd0 に修正
+            r_bit_cnt       <= 3'd0;
             r_shift         <= 8'd0;
             o_spi_s_miso    <= 1'b0;
-            o_spi_s_rx_done <= 1'b0;    // これもリセットが必要
+            o_spi_s_rx_done <= 1'b0;
         end
         // CS_n が Low なら SCK に合わせて動作
         else begin

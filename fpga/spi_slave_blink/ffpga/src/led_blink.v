@@ -26,7 +26,9 @@ module led_blink(
             cnt_up_reg <= {r_spi_s_rx_data, 24'd0};
             if(cnt_reg == cnt_up_reg) begin
                 cnt_reg <= 32'b0; // カウンタリセット
-                pin_state_bit <= ~pin_state_bit; // ピン状態反転
+                pin_state_bit <= 1'b1;
+            end else begin
+                pin_state_bit <= 1'b0;
             end
         end
     end
