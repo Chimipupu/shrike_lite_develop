@@ -150,8 +150,9 @@ void CPU_CORE_1_MAIN()
 {
     // CPU Core 0からLEDの状態をprintf()要求があれば
     if(s_led_state_print_req == true) {
-        Serial.printf("MCU LED: %s", fw_led_state ? "ON\r\n" : "OFF\r\n");
-        Serial.printf("FPGA LED: %s", fpga_led_state ? "ON\r\n" : "OFF\r\n");
+        // NOTE: FPGAのLEDはマイコンのLEDの逆状態
+        Serial.printf("MCU LED: %s", fw_led_state ? "OFF\r\n" : "ON\r\n");
+        Serial.printf("FPGA LED: %s", fpga_led_state ? "OFF\r\n" : "ON\r\n");
         s_led_state_print_req = false;
     }
 }
