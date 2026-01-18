@@ -30,8 +30,8 @@
 #include "Shrike.h"
 #define FPGA_BITSTREAM_PATH    "/FPGA_bitstream_MCU.bin"
 #define FPGA_RSTn_PIN          14 // FPGAリセットピン(Lowアクティブ)
-#define FPGA_LED_ON_DATA       0xAB
-#define FPGA_LED_OFF_DATA      0xFF
+#define FPGA_LED_ON_DATA       0xAA
+#define FPGA_LED_OFF_DATA      0x55
 
 ShrikeFlash shrike;
 static bool fw_led_state = false;
