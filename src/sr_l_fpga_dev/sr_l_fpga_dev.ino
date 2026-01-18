@@ -3,7 +3,7 @@
  * @author Chimi(https://github.com/Chimipupu)
  * @brief Shrike-lite用 RP2040側のF/W
  * @version 0.1
- * @date 2026-10-18
+ * @date 2026-01-18
  * 
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  * 
@@ -36,15 +36,18 @@
 ShrikeFlash shrike;
 static bool fw_led_state = false;
 static bool fpga_led_state = false;
-static bool s_led_state_print_req = false;
 
 static void fpga_init(const char* bitstream_path);
 static void fpga_rst_n_pin_ctrl(bool val);
-static void fpga_reg_write(uint8_t reg_addr, uint8_t data);
-static void fpga_led_ctrl(bool muc_val, bool fpga_val);
+static void fpga_reg_ctrl(uint8_t reg_addr, uint8_t tx_data, uint8_t *p_rx_data);
+static uint8_t fpga_led_ctrl(bool val);
+// *************************************************************
+
+static void led_ctrl(bool val);
 // *************************************************************
 // [Static関数]
 // *************************************************************
+
 static void fpga_rst_n_pin_ctrl(bool val)
 {
     // True = RSTn Low: リセット, False = RSTn High: リセット解除
@@ -74,32 +77,38 @@ static void fpga_init(const char* bitstream_path)
     fpga_rst_n_pin_ctrl(false);
 }
 
-static void fpga_reg_write(uint8_t reg_addr, uint8_t data)
+static void fpga_reg_ctrl(uint8_t reg_addr, uint8_t tx_data, uint8_t *p_rx_data)
 {
     digitalWrite(SPI_CS_PIN, LOW);  // CSアサート
-    // SPI.transfer(reg_addr);          // レジスタアドレス送信
-    SPI.transfer(data);              // データ送信
+    // SPI.transfer(reg_addr);         // TODO: レジスタアドレス送信
+    SPI.transfer(tx_data);          // データ送信
+    // *p_rx_data = SPI.transfer(0x00);   // ダミーデータ送信(受信するためのクロック供給)
     digitalWrite(SPI_CS_PIN, HIGH); // CSデアサート
 }
 
-// マイコンとFPGAのLED点滅制御
-static void fpga_led_ctrl(bool muc_val, bool fpga_val)
+// FPGAのLED制御
+static uint8_t fpga_led_ctrl(bool val)
+{
+    uint8_t tx_data = val ? FPGA_LED_ON_DATA : FPGA_LED_OFF_DATA;
+    uint8_t rx_data = 0;
+
+    fpga_reg_ctrl(0x00, tx_data, &rx_data);
+
+    return rx_data;
+}
+
+// マイコンのLED点滅制御
+static void led_ctrl(bool val)
 {
     // マイコンLED制御
-    digitalWrite(LED_BUILTIN, muc_val ? HIGH : LOW);
-    fw_led_state = muc_val;
-
-    // FPGA LED制御
-    if(fpga_val) {
-        fpga_reg_write(0x00, FPGA_LED_ON_DATA);
-    } else {
-        fpga_reg_write(0x00, FPGA_LED_OFF_DATA);
-    }
-    fpga_led_state = fpga_val;
+    digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
+    fw_led_state = val;
 }
+
 // *************************************************************
 // [CPU Core 0]
 // *************************************************************
+
 
 void CPU_CORE_0_INIT()
 {
@@ -126,14 +135,9 @@ void CPU_CORE_0_INIT()
 
 void CPU_CORE_0_MAIN()
 {
-    if(s_led_state_print_req == false) {
-        fpga_led_ctrl(fw_led_state, fpga_led_state);
-        fw_led_state = !fw_led_state;
-        fpga_led_state = !fw_led_state; // FPGA LEDはマイコンLEDの逆状態
-
-        // CPU Core 1へLEDの状態をprintf()要求
-        s_led_state_print_req = true;
-    }
+    led_ctrl(fw_led_state);
+    Serial.printf("MCU LED: %s", fw_led_state ? "OFF\r\n" : "ON\r\n");
+    fw_led_state = !fw_led_state;
     delay(MAIN_DELAY_MS);
 }
 
@@ -148,11 +152,9 @@ void CPU_CORE_1_INIT()
 
 void CPU_CORE_1_MAIN()
 {
-    // CPU Core 0からLEDの状態をprintf()要求があれば
-    if(s_led_state_print_req == true) {
-        // NOTE: FPGAのLEDはマイコンのLEDの逆状態
-        Serial.printf("MCU LED: %s", fw_led_state ? "OFF\r\n" : "ON\r\n");
-        Serial.printf("FPGA LED: %s", fpga_led_state ? "OFF\r\n" : "ON\r\n");
-        s_led_state_print_req = false;
-    }
+    uint8_t rx_data = 0;
+    rx_data = fpga_led_ctrl(fpga_led_state);
+    Serial.printf("FPGA LED: %s (RX: 0x%02X)\r\n", fpga_led_state ? "OFF" : "ON", rx_data);
+    fpga_led_state = !fw_led_state; // FPGA LEDはマイコンLEDの逆状態
+    delay(MAIN_DELAY_MS);
 }
