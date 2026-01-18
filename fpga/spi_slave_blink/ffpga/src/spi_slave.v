@@ -27,8 +27,6 @@ module spi_slave(
     // 送受信FIFO
     reg r_rx_done;
     reg [7:0] r_rx_data;
-    reg r_tx_done;
-    reg r_tx_data_set_done;
     reg [7:0] r_tx_data;
     reg [7:0] r_tx_shift;
 
@@ -94,32 +92,26 @@ module spi_slave(
     always @(posedge i_clk or negedge i_rst_n) begin
         if (!i_rst_n) begin
             r_tx_bit_cnt <= 3'd0;
-            r_tx_done <= 1'b0;
             o_spi_s_miso <= 1'b0;
         end else begin
-            r_tx_done <= 1'b0;
             // CSn = Low のときSPI通信有効
             if (w_cs_sync == 1'b0) begin
                 // SCKの立ち下がりエッジで動作
                 if (r_tx_bit_cnt == 0 && !w_sck_negedge) begin
                     // 最初のクロックが来る前(またはHigh区間)はBit7を出力
                     o_spi_s_miso <= r_tx_data[7];
-                end else if (w_sck_negedge) begin
+                end
+
+                if (w_sck_negedge) begin
                     // SCK立ち下がりで次のビット(Bit6...)をセット
                     o_spi_s_miso <= r_tx_data[7 - (r_tx_bit_cnt + 1)];
-                end
-                // ビットカウントアップ
-                r_tx_bit_cnt <= r_tx_bit_cnt + 1'b1;
-                // 8ビット送信完了判定
-                if (r_tx_bit_cnt == 3'd7) begin
-                    r_tx_bit_cnt <= 3'd0;
-                    r_tx_done <= 1'b1;
-                    r_tx_data_set_done <= 1'b0;
+                    // ビットカウントアップ
+                    r_tx_bit_cnt <= r_tx_bit_cnt + 1'b1;
                 end
             end else begin
                 // CSn = High (通信していない)ときに次のデータを準備する
                 r_tx_bit_cnt <= 3'd0;
-                r_tx_data <= r_tx_data;
+                r_tx_data <= r_tx_shift; // 送信データセット
             end
         end
     end
@@ -138,6 +130,8 @@ module spi_slave(
             end else if(r_rx_data == 8'h55) begin
                 o_led <= 1'b0;
                 r_tx_shift <= 8'hAA;
+            end else begin
+                r_tx_shift <= 8'd0;
             end
         end
     end

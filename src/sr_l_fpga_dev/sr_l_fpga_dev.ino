@@ -78,11 +78,8 @@ static void fpga_reg_write(uint8_t reg_addr, uint8_t data)
 {
     digitalWrite(SPI_CS_PIN, LOW);  // CSアサート
     // SPI.transfer(reg_addr);          // レジスタアドレス送信
-#if 1
     s_fpga_rx_data = SPI.transfer(data); // データ送信
-#else
-    s_fpga_rx_data = SPI.transfer(0x00); // ダミーデータ送信で受信データ取得
-#endif
+    s_fpga_rx_data = SPI.transfer(0x00); // ダミーデータ送信でデータ受信
     digitalWrite(SPI_CS_PIN, HIGH); // CSデアサート
 }
 
@@ -114,7 +111,7 @@ void CPU_CORE_0_INIT()
     pinMode(LED_BUILTIN, OUTPUT);
 
     // SPI初期化
-#if 0
+#if 1
     SPI.setMISO(SPI_MISO_PIN);
     SPI.setSCK(SPI_SCK_PIN);
     SPI.setMOSI(SPI_MOSI_PIN);
