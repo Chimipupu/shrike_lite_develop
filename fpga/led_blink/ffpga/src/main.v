@@ -1,8 +1,8 @@
 (* top *) module led_bilnk(
-    (* iopad_external_pin, clkbuf_inhibit *) input clk,
-    (* iopad_external_pin *) output led,
-    (* iopad_external_pin *) output led_en,
-    (* iopad_external_pin *) output clk_en
+    (* iopad_external_pin, clkbuf_inhibit *) input clk, // クロック = 50MHz
+    (* iopad_external_pin *) output led,                // LEDピン
+    (* iopad_external_pin *) output led_en,             // LEDピンの有効化ピン
+    (* iopad_external_pin *) output clk_en              // クロック入力の有効化ピン
     );
 
     // レジスタ
@@ -13,9 +13,14 @@
     assign clk_en = 1'b1; // クロック入力を有効化
 
     // カウンタ処理
-    always @(posedge clk) begin // クロック立ち上がりで動作
+    always @(posedge clk) begin    // クロック立ち上がりで動作
         cnt_reg <= cnt_reg + 1'b1; // カウントアップ
-        // カウント = 50,000,000 のとき、ピン状態を反転
+
+        // NOTE: カウント = 50_000_000 回、周期=1秒
+        // NOTE: カウント = 25_000_000 回、周期=500ms
+        // NOTE: カウント = 12_500_000 回、周期=250ms
+        // NOTE: カウント =  6_250_000 回、周期=125ms
+        // NOTE: カウント =  3_125_000 回、周期=62.5ms
         if(cnt_reg == 50_000_000) begin
             cnt_reg <= 32'b0; // カウンタリセット
             pin_state_bit <= !pin_state_bit; // ピン状態反転
