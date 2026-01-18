@@ -11,33 +11,37 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-
-#define CPU_CORE_0_INIT    setup
-#define CPU_CORE_0_MAIN    loop
-#define CPU_CORE_1_INIT    setup1
-#define CPU_CORE_1_MAIN    loop1
-
 #include <SPI.h>
 #define SPI_MISO_PIN       0
 #define SPI_CS_PIN         1
 #define SPI_SCK_PIN        2
 #define SPI_MOSI_PIN       3
-
-#define FPGA_RSTn_PIN      14 // FPGAリセットピン(Lowアクティブ)
 // *************************************************************
-// [FPGA関連設定]
+// [CPU コア関連、マルチコア関連]
+#define CPU_CORE_0_INIT    setup
+#define CPU_CORE_0_MAIN    loop
+#define CPU_CORE_1_INIT    setup1
+#define CPU_CORE_1_MAIN    loop1
+
+#define MAIN_DELAY_MS      1000
+
+// *************************************************************
+// [FPGA関連]
 #include "Shrike.h"
-ShrikeFlash shrike;
 #define FPGA_BITSTREAM_PATH    "/FPGA_bitstream_MCU.bin"
+#define FPGA_RSTn_PIN          14 // FPGAリセットピン(Lowアクティブ)
+#define FPGA_LED_ON_DATA       0xAB
+#define FPGA_LED_OFF_DATA      0xFF
+
+ShrikeFlash shrike;
+static bool fw_led_state = false;
+static bool fpga_led_state = false;
+static bool s_led_state_print_req = false;
+
 static void fpga_init(const char* bitstream_path);
 static void fpga_rst_n_pin_ctrl(bool val);
 static void fpga_reg_write(uint8_t reg_addr, uint8_t data);
 static void fpga_led_ctrl(bool muc_val, bool fpga_val);
-
-#define FPGA_LED_ON_DATA    0xAB
-#define FPGA_LED_OFF_DATA   0xFF
-static bool fw_led_state = false;
-static bool fpga_led_state = false;
 // *************************************************************
 // [Static関数]
 // *************************************************************
@@ -61,6 +65,7 @@ static void fpga_init(const char* bitstream_path)
     // ビットストリームをSPIで書き込み
     shrike.begin();
     shrike.flash(bitstream_path);
+    delay(500); // 書き込み完了待ち
 
     // FPGAをリセット
     pinMode(FPGA_RSTn_PIN, OUTPUT);
@@ -121,10 +126,15 @@ void CPU_CORE_0_INIT()
 
 void CPU_CORE_0_MAIN()
 {
-    fpga_led_ctrl(fw_led_state, fpga_led_state);
-    fw_led_state = !fw_led_state;
-    fpga_led_state = !fw_led_state; // FPGA LEDはマイコンLEDの逆状態
-    delay(100);
+    if(s_led_state_print_req == false) {
+        fpga_led_ctrl(fw_led_state, fpga_led_state);
+        fw_led_state = !fw_led_state;
+        fpga_led_state = !fw_led_state; // FPGA LEDはマイコンLEDの逆状態
+
+        // CPU Core 1へLEDの状態をprintf()要求
+        s_led_state_print_req = true;
+    }
+    delay(MAIN_DELAY_MS);
 }
 
 // *************************************************************
@@ -138,7 +148,10 @@ void CPU_CORE_1_INIT()
 
 void CPU_CORE_1_MAIN()
 {
-    Serial.printf("MCU LED: %s", fw_led_state ? "ON\r\n" : "OFF\r\n");
-    Serial.printf("FPGA LED: %s", fpga_led_state ? "ON\r\n" : "OFF\r\n");
-    delay(100);
+    // CPU Core 0からLEDの状態をprintf()要求があれば
+    if(s_led_state_print_req == true) {
+        Serial.printf("MCU LED: %s", fw_led_state ? "ON\r\n" : "OFF\r\n");
+        Serial.printf("FPGA LED: %s", fpga_led_state ? "ON\r\n" : "OFF\r\n");
+        s_led_state_print_req = false;
+    }
 }
