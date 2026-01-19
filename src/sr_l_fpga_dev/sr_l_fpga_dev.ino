@@ -4,18 +4,22 @@
  * @brief Shrike-lite用 RP2040側のF/W
  * @version 0.1
  * @date 2026-01-18
- * 
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
- * 
+ * @license MIT License
  */
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+
+// *************************************************************
+// [SPI関連]
 #include <SPI.h>
 #define SPI_MISO_PIN       0
 #define SPI_CS_PIN         1
 #define SPI_SCK_PIN        2
 #define SPI_MOSI_PIN       3
+
 // *************************************************************
 // [CPU コア関連、マルチコア関連]
 #define CPU_CORE_0_INIT    setup
@@ -77,9 +81,9 @@ static void fpga_init(const char* bitstream_path)
 static void fpga_reg_write(uint8_t reg_addr, uint8_t data)
 {
     digitalWrite(SPI_CS_PIN, LOW);  // CSアサート
-    // SPI.transfer(reg_addr);          // レジスタアドレス送信
+    // SPI.transfer(reg_addr);          // TODO: レジスタアドレス送信
     s_fpga_rx_data = SPI.transfer(data); // データ送信
-    s_fpga_rx_data = SPI.transfer(0x00); // ダミーデータ送信でデータ受信
+    // s_fpga_rx_data = SPI.transfer(0x00); // ダミーデータ送信でデータ受信
     digitalWrite(SPI_CS_PIN, HIGH); // CSデアサート
 }
 
@@ -152,8 +156,9 @@ void CPU_CORE_1_MAIN()
     // CPU Core 0からLEDの状態をprintf()要求があれば
     if(s_led_state_print_req == true) {
         // NOTE: FPGAのLEDはマイコンのLEDの逆状態
-        Serial.printf("MCU LED: %s", fw_led_state ? "OFF\r\n" : "ON\r\n");
-        Serial.printf("FPGA LED: %s (RX: 0x%02X)\r\n", fpga_led_state ? "OFF" : "ON", s_fpga_rx_data);
+        // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
+        Serial.printf("MCU LED: %s", !fw_led_state ? "OFF\r\n" : "ON\r\n");
+        Serial.printf("FPGA LED: %s (RX: 0x%02X)\r\n", !fpga_led_state ? "OFF" : "ON", s_fpga_rx_data);
         s_led_state_print_req = false;
     }
 }

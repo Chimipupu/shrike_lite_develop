@@ -1,3 +1,13 @@
+/**
+ * @file top.v
+ * @author Chimi(https://github.com/Chimipupu)
+ * @brief トップモジュール
+ * @version 0.1
+ * @date 2026-01-18
+ * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
+ * @license MIT License
+*/
+
 (* top *) module top(
     // リセット入力(RSTn = アクティブLOW)
     (* iopad_external_pin *) input i_rst_n,
