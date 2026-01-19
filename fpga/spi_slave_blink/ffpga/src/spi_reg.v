@@ -57,11 +57,11 @@ module spi_reg(
             case (cmd)
                 // コマンド            {Valid, LED, TX_DATA}
 
-                // デバッグレジスタ
+                // デバッグ用のレジスタ
                 8'hAA:get_cmd_info = {1'b1,  1'b1, 8'h55}; // RO, LED点灯, レジスタ値:0x55固定
                 8'h55:get_cmd_info = {1'b1,  1'b0, 8'hAA}; // RO, LED消灯, レジスタ値:0xAA固定
 
-                // WHO AM Iレジスタ
+                // WHO_AM_Iレジスタ
                 8'hF8:get_cmd_info = {1'b1,  1'b0, 8'h8F}; // RO, LED消灯, レジスタ値:0x8F固定
 
                 default: get_cmd_info = {1'b0, 1'b0, 8'h00};

@@ -40,16 +40,17 @@
 #define FPGA_WHO_AM_I_REG_VAL  0x8F
 
 ShrikeFlash shrike;
-static bool fw_led_state = false;
-static bool fpga_led_state = false;
+static bool s_fw_led_state = false;
+static bool s_fpga_led_state = false;
 static bool s_led_state_print_req = false;
-static uint8_t s_fpga_rx_data = 0;
-static uint8_t s_reg_who_am_i = 0;
+// static uint8_t s_fpga_rx_data = 0;
+static uint8_t s_fpga_dbg_reg = 0;
+static uint8_t s_fpga_who_am_i_reg = 0;
 
 static void fpga_init(const char* bitstream_path);
 static void fpga_rst_n_pin_ctrl(bool val);
 static void fpga_reg_write(uint8_t reg_addr, uint8_t data);
-static void fpga_led_ctrl(bool muc_val, bool fpga_val);
+static void fpga_led_ctrl(bool val);
 // *************************************************************
 // [Static関数]
 // *************************************************************
@@ -86,25 +87,30 @@ static void fpga_reg_write(uint8_t reg_addr, uint8_t data)
 {
     digitalWrite(SPI_CS_PIN, LOW);  // CSアサート
     // SPI.transfer(reg_addr);          // TODO: レジスタアドレス送信
-    s_fpga_rx_data = SPI.transfer(data); // データ送信
-    // s_fpga_rx_data = SPI.transfer(0x00); // ダミーデータ送信でデータ受信
+    SPI.transfer(data); // データ送信
     digitalWrite(SPI_CS_PIN, HIGH); // CSデアサート
 }
 
-// マイコンとFPGAのLED点滅制御
-static void fpga_led_ctrl(bool muc_val, bool fpga_val)
+static void fpga_reg_read(uint8_t reg_addr, uint8_t *p_data)
 {
-    // マイコンLED制御
-    digitalWrite(LED_BUILTIN, muc_val ? HIGH : LOW);
-    fw_led_state = muc_val;
+    // コマンド送信
+    fpga_reg_write(0x00, reg_addr);
 
-    // FPGA LED制御
-    if(fpga_val) {
+    digitalWrite(SPI_CS_PIN, LOW);  // CSアサート
+    *p_data = SPI.transfer(0x00);   // ダミーを送って受信
+    digitalWrite(SPI_CS_PIN, HIGH); // CSデアサート
+}
+
+// FPGAのLED点滅制御
+static void fpga_led_ctrl(bool val)
+{
+    if(val) {
         fpga_reg_write(0x00, FPGA_LED_ON_DATA);
+        fpga_reg_read(FPGA_LED_ON_DATA, &s_fpga_dbg_reg);
     } else {
         fpga_reg_write(0x00, FPGA_LED_OFF_DATA);
+        fpga_reg_read(FPGA_LED_OFF_DATA, &s_fpga_dbg_reg);
     }
-    fpga_led_state = fpga_val;
 }
 // *************************************************************
 // [CPU Core 0]
@@ -134,16 +140,17 @@ void CPU_CORE_0_INIT()
 
     // WHO AM Iレジスタ読み出し
     fpga_reg_write(0x00, FPGA_WHO_AM_I_REG);
-    s_reg_who_am_i = s_fpga_rx_data;
-    Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_reg_who_am_i);
+    fpga_reg_read(FPGA_WHO_AM_I_REG, &s_fpga_who_am_i_reg);
+    Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_fpga_who_am_i_reg);
 }
 
 void CPU_CORE_0_MAIN()
 {
     if(s_led_state_print_req == false) {
-        fpga_led_ctrl(fw_led_state, fpga_led_state);
-        fw_led_state = !fw_led_state;
-        fpga_led_state = !fw_led_state; // FPGA LEDはマイコンLEDの逆状態
+        digitalWrite(LED_BUILTIN, s_fw_led_state ? HIGH : LOW);
+        fpga_led_ctrl(s_fpga_led_state);
+        s_fw_led_state = !s_fw_led_state;
+        s_fpga_led_state = !s_fw_led_state;
 
         // CPU Core 1へLEDの状態をprintf()要求
         s_led_state_print_req = true;
@@ -165,12 +172,12 @@ void CPU_CORE_1_MAIN()
     // CPU Core 0からLEDの状態をprintf()要求があれば
     if(s_led_state_print_req == true) {
         // WHO AM Iレジスタ
-        Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_reg_who_am_i);
+        Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_fpga_who_am_i_reg);
 
         // NOTE: FPGAのLEDはマイコンのLEDの逆状態
         // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
-        Serial.printf("MCU LED: %s", !fw_led_state ? "OFF\r\n" : "ON\r\n");
-        Serial.printf("FPGA LED: %s (RX: 0x%02X)\r\n", !fpga_led_state ? "OFF" : "ON", s_fpga_rx_data);
+        Serial.printf("[MCU] LED: %s", !s_fw_led_state ? "ON\r\n" : "OFF\r\n");
+        Serial.printf("[FPGA] LED: %s (FPGA Reg Read: 0x%02X)\r\n", !s_fpga_led_state ? "ON" : "OFF", s_fpga_dbg_reg);
         s_led_state_print_req = false;
     }
 }
