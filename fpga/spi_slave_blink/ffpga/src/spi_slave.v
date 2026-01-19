@@ -21,24 +21,10 @@ module spi_slave(
     output o_spi_s_miso_oe,   // SPI MISOピンのOEピン
     output reg o_spi_s_miso,  // SPI MISOピン
 
-    // LEDピン
-    output reg o_led,
-    output o_led_en
+    output reg        o_rx_done,      // 受信完了フラグ
+    output reg  [7:0] o_rx_data,      // 受信データ
+    input  wire [7:0] i_tx_data       // 送信データ
     );
-
-    // LEDを有効化
-    assign o_led_en = 1'b1;
-
-    // ビットカウンタ(RX, TX)
-    reg [2:0] r_rx_bit_cnt;
-    reg [2:0] r_tx_bit_cnt;
-
-    // 送受信FIFO
-    reg r_rx_done;
-    reg [7:0] r_rx_data;
-    reg [7:0] r_tx_data;
-    reg [7:0] r_tx_shift;
-
     // ----------------------------------------------------------------
     // メタスタビリティ対策用 2段FFシンクロナイザ
     reg [1:0] r_sck_sync;  // SCK同期用2段FF
@@ -72,26 +58,32 @@ module spi_slave(
     // MISOピンはCSnがLowでアサートされているときだけ有効
     assign o_spi_s_miso_oe = ~w_cs_sync;
     // ----------------------------------------------------------------
-    // SPI受信処理
+    // [SPI受信処理関連]
+    reg [2:0] r_rx_bit_cnt;
+    reg [7:0] r_rx_shift;
+
     always @(posedge i_clk or negedge i_rst_n) begin
         if (!i_rst_n) begin
-            r_rx_data <= 8'd0;
+            r_rx_shift   <= 8'd0;
             r_rx_bit_cnt <= 3'd0;
-            r_rx_done <= 1'b0;
+            o_rx_done    <= 1'b0;
+            o_rx_data    <= 8'd0;
         end else begin
-            r_rx_done <= 1'b0;
+            o_rx_done <= 1'b0;
 
             // CSn = Low のときSPI通信有効
             if (w_cs_sync == 1'b0) begin
                 // SCKの立ち上がりエッジのみで動作
                 if (w_sck_posedge) begin
-                    // シフトイン (MSBファースト)
-                    r_rx_data <= {r_rx_data[6:0], w_mosi_sync};
+                    // 内部シフトレジスタにMOSIデータをシフトイン
+                    r_rx_shift <= {r_rx_shift[6:0], w_mosi_sync};
                     // ビットカウントアップ
                     r_rx_bit_cnt <= r_rx_bit_cnt + 1'b1;
                     // 8ビット受信完了判定
                     if (r_rx_bit_cnt == 3'd7) begin
-                        r_rx_done <= 1'b1; // 1クロックだけHigh
+                        o_rx_done <= 1'b1;
+                        // 内部シフトレジスタのデータを受信データにセット
+                        o_rx_data <= {r_rx_shift[6:0], w_mosi_sync};
                     end
                 end
             end else begin
@@ -102,53 +94,37 @@ module spi_slave(
     end
 
     // ----------------------------------------------------------------
-    // SPI送信処理
+    // [SPI送信処理関連]
+    reg [2:0] r_tx_bit_cnt;
+    reg [7:0] r_tx_shift;   // 送信シフトレジスタ
+
     always @(posedge i_clk or negedge i_rst_n) begin
         if (!i_rst_n) begin
             r_tx_bit_cnt <= 3'd0;
+            r_tx_shift   <= 8'd0;
             o_spi_s_miso <= 1'b0;
         end else begin
             // CSn = Low のときSPI通信有効
             if (w_cs_sync == 1'b0) begin
                 // SCKの立ち上がりエッジ && 最初のビット(MSB)
                 if (r_tx_bit_cnt == 3'd0 && !w_sck_negedge) begin
-                    o_spi_s_miso <= r_tx_data[7]; // MSBをセット
+                    o_spi_s_miso <= r_tx_shift[7]; // MSBをセット
                 end
 
                 // SCKの立ち下がりエッジ
                 if (w_sck_negedge) begin
-                    o_spi_s_miso <= r_tx_data[6];           // 次のビットをセット
-                    r_tx_data    <= {r_tx_data[6:0], 1'b0}; // 次のビットへシフト
-                    r_tx_bit_cnt <= r_tx_bit_cnt + 1'b1;    // 送信ビットをカウントアップ
+                    o_spi_s_miso <= r_tx_shift[6];           // 次のビットをセット
+                    r_tx_shift   <= {r_tx_shift[6:0], 1'b0}; // 次のビットにシフト
+                    r_tx_bit_cnt <= r_tx_bit_cnt + 1'b1;     // 送信ビットをカウントアップ
                 end
             end else begin
+                r_tx_shift <= i_tx_data; // 送信データをセット
+                r_tx_bit_cnt <= 3'd0;    // CSn = Highでカウントリセット
                 o_spi_s_miso <= 1'b0;    // CSn = HighのときはMISOをLowに
-                r_tx_bit_cnt <= 3'd0;    // CSn = Highになったらカウンタをリセット
-                r_tx_data <= r_tx_shift; // 送信データをセット
             end
         end
     end
 
-    // ----------------------------------------------------------------
-    // 送信データ準備
-    always @(posedge i_clk or negedge i_rst_n) begin
-        if(!i_rst_n) begin
-            o_led <= 1'b0;
-            r_tx_shift <= 8'd0;
-        end else if(r_rx_done) begin
-            // 受信データ = 0xAAならLEDをON
-            if(r_rx_data == 8'hAA) begin
-                o_led <= 1'b1;
-                r_tx_shift <= 8'h55;
-            // 受信データ = 0x55ならLEDをOFF
-            end else if(r_rx_data == 8'h55) begin
-                o_led <= 1'b0;
-                r_tx_shift <= 8'hAA;
-            end else begin
-                r_tx_shift <= 8'd0;
-            end
-        end
-    end
     // ----------------------------------------------------------------
 
 endmodule
