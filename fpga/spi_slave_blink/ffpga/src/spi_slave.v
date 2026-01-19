@@ -26,9 +26,6 @@ module spi_slave(
     output o_led_en
     );
 
-    // MISOピンは常に出力有効
-    assign o_spi_s_miso_oe = 1'b1;
-
     // LEDを有効化
     assign o_led_en = 1'b1;
 
@@ -72,6 +69,8 @@ module spi_slave(
     wire w_sck_posedge = (r_sck_sync[1:0] == 2'b01); // SCK ↑ 立ち上がりエッジ(0 -> 1)
     wire w_sck_negedge = (r_sck_sync[1:0] == 2'b10); // SCK ↓ 立ち下がりエッジ(1 -> 0)
 
+    // MISOピンはCSnがLowでアサートされているときだけ有効
+    assign o_spi_s_miso_oe = ~w_cs_sync;
     // ----------------------------------------------------------------
     // SPI受信処理
     always @(posedge i_clk or negedge i_rst_n) begin
@@ -80,6 +79,8 @@ module spi_slave(
             r_rx_bit_cnt <= 3'd0;
             r_rx_done <= 1'b0;
         end else begin
+            r_rx_done <= 1'b0;
+
             // CSn = Low のときSPI通信有効
             if (w_cs_sync == 1'b0) begin
                 // SCKの立ち上がりエッジのみで動作
@@ -90,9 +91,7 @@ module spi_slave(
                     r_rx_bit_cnt <= r_rx_bit_cnt + 1'b1;
                     // 8ビット受信完了判定
                     if (r_rx_bit_cnt == 3'd7) begin
-                        r_rx_done <= 1'b1; // 1クロックだけHighになる
-                    end else begin
-                        r_rx_done <= 1'b0;
+                        r_rx_done <= 1'b1; // 1クロックだけHigh
                     end
                 end
             end else begin
@@ -111,22 +110,21 @@ module spi_slave(
         end else begin
             // CSn = Low のときSPI通信有効
             if (w_cs_sync == 1'b0) begin
-                // SCKの立ち下がりエッジで動作
-                if (r_tx_bit_cnt == 0 && !w_sck_negedge) begin
-                    // 最初のクロックが来る前(またはHigh区間)はBit7を出力
-                    o_spi_s_miso <= r_tx_data[7];
+                // SCKの立ち上がりエッジ && 最初のビット(MSB)
+                if (r_tx_bit_cnt == 3'd0 && !w_sck_negedge) begin
+                    o_spi_s_miso <= r_tx_data[7]; // MSBをセット
                 end
 
+                // SCKの立ち下がりエッジ
                 if (w_sck_negedge) begin
-                    // SCK立ち下がりで次のビット(Bit6...)をセット
-                    o_spi_s_miso <= r_tx_data[7 - (r_tx_bit_cnt + 1)];
-                    // ビットカウントアップ
-                    r_tx_bit_cnt <= r_tx_bit_cnt + 1'b1;
+                    o_spi_s_miso <= r_tx_data[6];           // 次のビットをセット
+                    r_tx_data    <= {r_tx_data[6:0], 1'b0}; // 次のビットへシフト
+                    r_tx_bit_cnt <= r_tx_bit_cnt + 1'b1;    // 送信ビットをカウントアップ
                 end
             end else begin
-                // CSn = High (通信していない)ときに次のデータを準備する
-                r_tx_bit_cnt <= 3'd0;
-                r_tx_data <= r_tx_shift; // 送信データセット
+                o_spi_s_miso <= 1'b0;    // CSn = HighのときはMISOをLowに
+                r_tx_bit_cnt <= 3'd0;    // CSn = Highになったらカウンタをリセット
+                r_tx_data <= r_tx_shift; // 送信データをセット
             end
         end
     end
