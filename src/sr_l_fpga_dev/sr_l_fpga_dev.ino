@@ -36,12 +36,16 @@
 #define FPGA_RSTn_PIN          14 // FPGAリセットピン(Lowアクティブ)
 #define FPGA_LED_ON_DATA       0xAA
 #define FPGA_LED_OFF_DATA      0x55
+#define FPGA_WHO_AM_I_REG      0xF8
+#define FPGA_WHO_AM_I_REG_VAL  0x8F
 
 ShrikeFlash shrike;
 static bool fw_led_state = false;
 static bool fpga_led_state = false;
 static bool s_led_state_print_req = false;
 static uint8_t s_fpga_rx_data = 0;
+static uint8_t s_reg_who_am_i = 0;
+
 static void fpga_init(const char* bitstream_path);
 static void fpga_rst_n_pin_ctrl(bool val);
 static void fpga_reg_write(uint8_t reg_addr, uint8_t data);
@@ -127,6 +131,11 @@ void CPU_CORE_0_INIT()
     // シリアル初期化
     Serial.begin(115200);
     while (!Serial && millis() < 3000);
+
+    // WHO AM Iレジスタ読み出し
+    fpga_reg_write(0x00, FPGA_WHO_AM_I_REG);
+    s_reg_who_am_i = s_fpga_rx_data;
+    Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_reg_who_am_i);
 }
 
 void CPU_CORE_0_MAIN()
@@ -155,6 +164,9 @@ void CPU_CORE_1_MAIN()
 {
     // CPU Core 0からLEDの状態をprintf()要求があれば
     if(s_led_state_print_req == true) {
+        // WHO AM Iレジスタ
+        Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_reg_who_am_i);
+
         // NOTE: FPGAのLEDはマイコンのLEDの逆状態
         // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
         Serial.printf("MCU LED: %s", !fw_led_state ? "OFF\r\n" : "ON\r\n");
