@@ -63,9 +63,10 @@ static uint8_t fpga_spi_test(void);
 #define SPI_SCK_PIN        2
 #define SPI_MOSI_PIN       3
 
-// NOTE: FPGA側へのSPI SCKは12MHzが限界？
+// NOTE: FPGA側(OSC=50MHz)のSPIスレーブのSCKは 10MHz が限界？
 #define SPI_SCK_5MHZ       5000000
 #define SPI_SCK_10MHZ      10000000
+#define SPI_SCK_11MHZ      11000000
 #define SPI_SCK_12MHZ      12000000
 #define SPI_SCK_13MHZ      13000000
 // #define SPI_SCK_12_5MHZ    12500000
@@ -76,8 +77,8 @@ static uint8_t fpga_spi_test(void);
 // #define SPI_SCK_40MHZ      40000000
 // #define SPI_SCK_50MHZ      50000000
 
-#define SPI_SCK_VAL           SPI_SCK_13MHZ
-SPISettings g_spi_setting(SPI_SCK_10MHZ, MSBFIRST, SPI_MODE0);
+#define SPI_SCK_VAL           SPI_SCK_10MHZ
+SPISettings g_spi_setting(SPI_SCK_VAL, MSBFIRST, SPI_MODE0);
 
 // *************************************************************
 // [Static関数]
@@ -157,11 +158,9 @@ static uint8_t fpga_spi_test(void)
         tmp = 0;
         fpga_reg_write(0x00, FPGA_WHO_AM_I_REG);
         fpga_reg_read(FPGA_WHO_AM_I_REG, (uint8_t *)&tmp);
-
         if(tmp != FPGA_WHO_AM_I_REG_VAL) {
             s_err_cnt++;
         }
-
         s_test_cnt++;
     } else {
         if(s_err_cnt >= 0) {
@@ -169,8 +168,7 @@ static uint8_t fpga_spi_test(void)
         } else {
             ret = FPGA_TEST_RET_OK;
         }
-
-        Serial.printf("[DEBUG] FPGA (SCK = %d MHz): Test=%d, ERROR=%d\n", SPI_SCK_VAL / 1000000, s_test_cnt, s_err_cnt);
+        Serial.printf("[DEBUG] FPGA TEST...SCK: %d MHz, Check: %d, Err: %d\n",SPI_SCK_VAL / 1000000, s_test_cnt, s_err_cnt);
     }
 
     return ret;
