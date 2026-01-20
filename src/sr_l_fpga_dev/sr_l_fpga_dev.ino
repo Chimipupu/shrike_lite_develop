@@ -246,7 +246,10 @@ void CPU_CORE_1_MAIN()
     if(s_is_fpga_err != true) {
         if(s_led_state_print_req == true) {
             // WHO AM Iレジスタ
+            fpga_reg_write(0x00, FPGA_WHO_AM_I_REG);
+            fpga_reg_read(FPGA_WHO_AM_I_REG, &s_fpga_who_am_i_reg);
             Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_fpga_who_am_i_reg);
+
             // NOTE: FPGAのLEDはマイコンのLEDの逆状態
             // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
             Serial.printf("[MCU] LED: %s", !s_fw_led_state ? "ON\r\n" : "OFF\r\n");
