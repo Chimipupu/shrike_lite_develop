@@ -46,7 +46,7 @@ static void fpga_reg_write(uint8_t reg_addr, uint8_t data);
 static void fpga_led_ctrl(bool val);
 
 // (DEBUG) FPGAテスト関連
-#define DEBUG_FPGA_TEST
+// #define DEBUG_FPGA_TEST
 
 #ifdef DEBUG_FPGA_TEST
 #define FPGA_SPI_SCK_TEST_CNT       1000000
@@ -79,6 +79,9 @@ static uint8_t fpga_spi_test(void);
 
 #define SPI_SCK_VAL           SPI_SCK_10MHZ
 SPISettings g_spi_setting(SPI_SCK_VAL, MSBFIRST, SPI_MODE0);
+
+// *************************************************************
+volatile bool s_is_fpga_err = false;
 
 // *************************************************************
 // [Static関数]
@@ -187,11 +190,9 @@ void CPU_CORE_0_INIT()
     pinMode(LED_BUILTIN, OUTPUT);
 
     // SPI初期化
-#if 1
     SPI.setMISO(SPI_MISO_PIN);
     SPI.setSCK(SPI_SCK_PIN);
     SPI.setMOSI(SPI_MOSI_PIN);
-#endif
     pinMode(SPI_CS_PIN, OUTPUT);
     digitalWrite(SPI_CS_PIN, HIGH);
     SPI.begin();
@@ -201,29 +202,33 @@ void CPU_CORE_0_INIT()
     while (!Serial && millis() < 3000);
 
 #ifdef DEBUG_FPGA_TEST
-    static uint8_t s_ret = FPGA_TEST_RET_EXEC;
     // (DEBUG)FPGAテスト
+    static uint8_t s_ret = FPGA_TEST_RET_EXEC;
     while (s_ret == FPGA_TEST_RET_EXEC)
     {
         s_ret = fpga_spi_test();
     }
-#endif // DEBUG_FPGA_TEST
+
+    if(s_ret == FPGA_TEST_RET_ERR) {
+        s_is_fpga_err = true;
+    }
+#endif
 }
 
 void CPU_CORE_0_MAIN()
 {
-#ifndef DEBUG_FPGA_TEST
-    if(s_led_state_print_req == false) {
-        digitalWrite(LED_BUILTIN, s_fw_led_state ? HIGH : LOW);
-        fpga_led_ctrl(s_fpga_led_state);
-        s_fw_led_state = !s_fw_led_state;
-        s_fpga_led_state = !s_fw_led_state;
+    if(s_is_fpga_err != true) {
+        if(s_led_state_print_req == false) {
+            digitalWrite(LED_BUILTIN, s_fw_led_state ? HIGH : LOW);
+            fpga_led_ctrl(s_fpga_led_state);
+            s_fw_led_state = !s_fw_led_state;
+            s_fpga_led_state = !s_fw_led_state;
 
-        // CPU Core 1へLEDの状態をprintf()要求
-        s_led_state_print_req = true;
+            // CPU Core 1へLEDの状態をprintf()要求
+            s_led_state_print_req = true;
+        }
+        delay(MAIN_DELAY_MS);
     }
-    delay(MAIN_DELAY_MS);
-#endif
 }
 
 // *************************************************************
@@ -237,16 +242,16 @@ void CPU_CORE_1_INIT()
 
 void CPU_CORE_1_MAIN()
 {
-#ifndef DEBUG_FPGA_TEST
     // CPU Core 0からLEDの状態をprintf()要求があれば
-    if(s_led_state_print_req == true) {
-        // WHO AM Iレジスタ
-        Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_fpga_who_am_i_reg);
-        // NOTE: FPGAのLEDはマイコンのLEDの逆状態
-        // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
-        Serial.printf("[MCU] LED: %s", !s_fw_led_state ? "ON\r\n" : "OFF\r\n");
-        Serial.printf("[FPGA] LED: %s (FPGA Reg Read: 0x%02X)\r\n", !s_fpga_led_state ? "ON" : "OFF", s_fpga_dbg_reg);
-        s_led_state_print_req = false;
+    if(s_is_fpga_err != true) {
+        if(s_led_state_print_req == true) {
+            // WHO AM Iレジスタ
+            Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_fpga_who_am_i_reg);
+            // NOTE: FPGAのLEDはマイコンのLEDの逆状態
+            // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
+            Serial.printf("[MCU] LED: %s", !s_fw_led_state ? "ON\r\n" : "OFF\r\n");
+            Serial.printf("[FPGA] LED: %s (FPGA Reg Read: 0x%02X)\r\n", !s_fpga_led_state ? "ON" : "OFF", s_fpga_dbg_reg);
+            s_led_state_print_req = false;
+        }
     }
-#endif
 }
