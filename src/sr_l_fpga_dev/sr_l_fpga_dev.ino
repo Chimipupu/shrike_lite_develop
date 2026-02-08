@@ -19,7 +19,7 @@
 #define CPU_CORE_1_INIT    setup1
 #define CPU_CORE_1_MAIN    loop1
 
-#define MAIN_DELAY_MS      1000
+#define MAIN_DELAY_MS      100
 
 // *************************************************************
 // [FPGA関連]
@@ -245,15 +245,19 @@ void CPU_CORE_1_MAIN()
     // CPU Core 0からLEDの状態をprintf()要求があれば
     if(s_is_fpga_err != true) {
         if(s_led_state_print_req == true) {
+#if 1
             // WHO AM Iレジスタ
             fpga_reg_write(0x00, FPGA_WHO_AM_I_REG);
             fpga_reg_read(FPGA_WHO_AM_I_REG, &s_fpga_who_am_i_reg);
             Serial.printf("[FPGA] WHO_AM_I Reg(Addr:0x%02X) = 0x%02X\n", FPGA_WHO_AM_I_REG, s_fpga_who_am_i_reg);
+#endif
 
+#if 1
             // NOTE: FPGAのLEDはマイコンのLEDの逆状態
             // NOTE: Reqが来る時点で状態は反転済みなのでLED状態はその反転
             Serial.printf("[MCU] LED: %s", !s_fw_led_state ? "ON\r\n" : "OFF\r\n");
             Serial.printf("[FPGA] LED: %s (FPGA Reg Read: 0x%02X)\r\n", !s_fpga_led_state ? "ON" : "OFF", s_fpga_dbg_reg);
+#endif
             s_led_state_print_req = false;
         }
     }

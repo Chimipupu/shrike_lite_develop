@@ -52,18 +52,16 @@ module spi_reg(
     );
 
     // ----------------------------------------------------------------
+    // 戻り値: コマンドのテーブル結果(10bit), 引数: SPI受信コマンド(8bit)
     function [9:0] get_cmd_info(input [7:0] cmd);
         begin
             case (cmd)
                 // コマンド            {Valid, LED, TX_DATA}
-
                 // デバッグ用のレジスタ
                 8'hAA:get_cmd_info = {1'b1,  1'b1, 8'h55}; // RO, LED点灯, レジスタ値:0x55固定
                 8'h55:get_cmd_info = {1'b1,  1'b0, 8'hAA}; // RO, LED消灯, レジスタ値:0xAA固定
-
                 // WHO_AM_Iレジスタ
                 8'hF8:get_cmd_info = {1'b1,  1'b0, 8'h8F}; // RO, LED消灯, レジスタ値:0x8F固定
-
                 default: get_cmd_info = {1'b0, 1'b0, 8'h00};
             endcase
         end
@@ -72,9 +70,9 @@ module spi_reg(
     wire [9:0]  w_cmd_lut_tbl; // コマンドのルックアップテーブル
     assign w_cmd_lut_tbl = get_cmd_info(w_rx_data); // テーブル検索
 
-    wire       w_cmd_valid = w_cmd_lut_tbl[9];   // 有効フラグ
-    wire       w_cmd_led   = w_cmd_lut_tbl[8];   // LED値
-    wire [7:0] w_cmd_tx    = w_cmd_lut_tbl[7:0]; // 送信データ
+    wire       w_cmd_valid = w_cmd_lut_tbl[9];   // コマンド有効フラグ
+    wire       w_cmd_led   = w_cmd_lut_tbl[8];   // (DEBUG)デバッグ用LEDの状態
+    wire [7:0] w_cmd_tx    = w_cmd_lut_tbl[7:0]; // SPIの送信データ、レジスタ値
 
     always @(posedge i_clk or negedge i_rst_n) begin
         if(!i_rst_n) begin
